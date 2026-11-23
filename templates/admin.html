@@ -1,0 +1,9 @@
+<style>
+* { box-sizing: border-box; }
+button:hover { opacity: 0.9; }
+div, form { background: rgba(255,255,255,0.05); border-radius: 15px; }
+</style><h1>Admin Dashboard</h1>
+<h3>Users List</h3>
+{% for u in users %}
+<p>{{ u['name'] }} - {{ u['email'] }}</p>
+{% endfor %}

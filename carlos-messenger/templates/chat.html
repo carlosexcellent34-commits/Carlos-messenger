@@ -1,0 +1,1 @@
+<h1>Chat with {{friend}}</h1>{% for m in msgs %}<p><b>{{m['sender']}}:</b> {{m['text']}}</p>{% endfor %}<form method='post'><input name='text'><button>Send</button></form><a href='/'>Back</a>

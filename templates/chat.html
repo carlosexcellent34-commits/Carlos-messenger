@@ -1,0 +1,5 @@
+<style>
+* { box-sizing: border-box; }
+button:hover { opacity: 0.9; }
+div, form { background: rgba(255,255,255,0.05); border-radius: 15px; }
+</style><h1>Chat with {{friend}}</h1>{% for m in msgs %}<p><b>{{m['sender']}}:</b> {{m['text']}}</p>{% endfor %}<form method='post'><input name='text'><button>Send</button></form><a href='/'>Back</a>
