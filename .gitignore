@@ -1,0 +1,7 @@
+node_modules/
+carlos.db
+*.backup
+*.backup2
+*.backup3
+public_backup_old/
+carlos-messenger

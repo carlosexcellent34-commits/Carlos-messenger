@@ -1,29 +1,131 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CARLOS MESSENGER</title><style>*{box-sizing:border-box}body{margin:0;font-family:system-ui;background:#0b141a;color:#fff}header{background:#008069;padding:14px;display:flex;justify-content:space-between;align-items:center}.logo{width:38px;height:38px;background:#fff;color:#008069;border-radius:50%;display:grid;place-items:center;font-size:24px;font-weight:900}.tabs{display:flex;background:#008069}.tabs button{flex:1;padding:12px;background:none;border:none;color:#fff;font-weight:700}.tabs button.active{background:#00695c}main{padding:12px;padding-bottom:80px}.card{background:#111b21;padding:12px;border-radius:12px;margin-bottom:10px}input{width:100%;padding:12px;margin:6px 0;border-radius:10px;border:none;background:#202c33;color:#fff}button.btn{width:100%;padding:12px;background:#00a884;border:none;border-radius:10px;color:#fff;font-weight:800}.bubble{background:#005c4b;padding:10px;border-radius:12px;margin:6px 0;max-width:85%}.bubble.me{margin-left:auto;background:#00a884}</style></head>
-<body><header><div class="logo">C</div><b>CARLOS MESSENGER</b><span>● Online</span></header>
-<div class="tabs"><button onclick="show('chats',this)" class="active">Chats</button><button onclick="show('updates',this)">Updates</button><button onclick="show('communities',this)">Communities</button><button onclick="show('calls',this)">Calls</button><button onclick="show('settings',this)">Settings</button></div>
-<main>
-<div id="chats"><div class="card"><h3>Login / Register</h3><input id="login" placeholder="Phone / Email / Username"><input id="pass" type="password" placeholder="Password"><button class="btn" onclick="login()">Login</button><input id="phone" placeholder="Phone e.g +234..."><button class="btn" onclick="sendOtp()">Send OTP via Termii</button><input id="otp" placeholder="OTP Code"><input id="regName" placeholder="Full Name"><input id="regUser" placeholder="Username"><button class="btn" onclick="register()">Create Account</button></div><div class="card"><h3>New Chat</h3><input id="chatName" placeholder="Chat name / Group name"><button class="btn" onclick="createChat()">Create Chat / Group</button><div id="chatList"></div></div><div class="card"><h3>Messages</h3><div id="msgs"></div><input id="msgText" placeholder="Type message..."><button class="btn" onclick="sendMsg()">Send ➤</button></div></div>
-<div id="updates" style="display:none"><div class="card"><h3>Status - 24h</h3><input id="statusText" placeholder="Text status..."><button class="btn" onclick="postStatus()">Post Status</button><div id="statusList"></div></div></div>
-<div id="communities" style="display:none"><div class="card"><h3>Communities</h3><button class="btn" onclick="createChat()">Create Community</button></div></div>
-<div id="calls" style="display:none"><div class="card"><h3>Voice & Video Calls</h3><button class="btn" onclick="startCall('voice')">🎙️ Voice Call</button><br><br><button class="btn" onclick="startCall('video')">📹 Video Call</button><video id="localVideo" autoplay muted style="width:100%"></video><div id="callLog"></div></div></div>
-<div id="settings" style="display:none"><div class="card"><h3>Settings</h3><input id="setName" placeholder="Name"><input id="setBio" placeholder="Bio"><button class="btn" onclick="saveProfile()">Save Profile</button><button class="btn" onclick="toggleTheme()">Toggle Dark / Light</button><button class="btn" onclick="admin()">Admin Dashboard</button><div id="adminBox"></div></div></div>
-</main>
-<script src="/socket.io/socket.io.js"></script><script>
-let token=localStorage.getItem('carlos_token'),user=null,socket=io(),currentChat=null;
-function show(id,el){['chats','updates','communities','calls','settings'].forEach(x=>document.getElementById(x).style.display=x==id?'block':'none');document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
-async function api(p,m,b){let r=await fetch(p,{method:m,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:b?JSON.stringify(b):undefined});return r.json()}
-async function sendOtp(){alert(JSON.stringify(await api('/api/send-otp','POST',{phone:document.getElementById('phone').value})))}
-async function register(){let r=await api('/api/register','POST',{phone:document.getElementById('phone').value,email:document.getElementById('phone').value+'@carlos.app',username:document.getElementById('regUser').value,password:document.getElementById('pass').value,name:document.getElementById('regName').value});if(r.token){token=r.token;localStorage.setItem('carlos_token',token);alert('Account created! ID: '+r.user.id)}else alert(r.error)}
-async function login(){let r=await api('/api/login','POST',{login:document.getElementById('login').value,password:document.getElementById('pass').value});if(r.token){token=r.token;localStorage.setItem('carlos_token',token);user=r.user;socket.emit('join-user',user.id);alert('Welcome '+user.name);loadChats()}else alert(r.error)}
-async function createChat(){let r=await api('/api/chats','POST',{type:'group',name:document.getElementById('chatName').value});currentChat=r.id;socket.emit('join',currentChat);alert('Chat created: '+r.id);loadChats()}
-async function loadChats(){let chats=await api('/api/chats','GET');document.getElementById('chatList').innerHTML=(chats||[]).map(c=>`<div class="bubble" onclick="openChat('${c.id}')">${c.name||c.id} - Tap to open</div>`).join('')}
-async function openChat(id){currentChat=id;socket.emit('join',id);let ms=await api('/api/messages/'+id,'GET');document.getElementById('msgs').innerHTML=ms.map(m=>`<div class="bubble ${m.senderId==user?.id?'me':''}">${m.text} <span>✓✓ ${new Date(m.createdAt).toLocaleTimeString()}</span></div>`).join('')}
-async function sendMsg(){let t=document.getElementById('msgText').value;if(!currentChat)return alert('Open a chat first');await api('/api/messages','POST',{chatId:currentChat,text:t});document.getElementById('msgText').value=''}
-async function postStatus(){await api('/api/status','POST',{text:document.getElementById('statusText').value});alert('Status posted, disappears in 24h')}
-async function saveProfile(){await api('/api/profile','POST',{name:document.getElementById('setName').value,bio:document.getElementById('setBio').value});alert('Profile saved')}
-function toggleTheme(){document.body.style.background=document.body.style.background=='white'?'#0b141a':'white';document.body.style.color=document.body.style.color=='black'?'#fff':'black'}
-async function admin(){let s=await api('/api/admin/stats','GET');document.getElementById('adminBox').innerHTML=`<p>Users: ${s.users} | Messages: ${s.messages}</p>`}
-async function startCall(type){alert(type+' call ringing... Allow mic/camera');try{let s=await navigator.mediaDevices.getUserMedia({audio:true,video:type=='video'});document.getElementById('localVideo').srcObject=s}catch(e){alert('Allow mic/camera')}}
-socket.on('new-message',m=>{if(m.chatId==currentChat)openChat(currentChat)});
-socket.on('incoming-call',d=>{if(confirm('Incoming call from '+d.callerId+' Accept?'))alert('Call connected')});
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CARLOS MESSENGER</title><script src="/socket.io/socket.io.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+:root{--bg:#080D1C;--bg2:#101A30;--card:#16213A;--p:#7C3AED;--p2:#A855F7;--blue:#1D4ED8;--txt:#fff;--mut:#A7B1C5;--green:#22C55E}
+body{background:var(--bg);color:var(--txt);overflow-x:hidden}
+button,input{font:inherit}button{cursor:pointer;border:0}
+.screen{display:none;min-height:100dvh}.screen.active{display:flex;flex-direction:column}
+.auth{padding:22px;justify-content:center;position:relative;overflow:hidden}
+.auth::before{content:"";position:absolute;width:320px;height:320px;background:radial-gradient(circle,#7C3AED66,transparent 70%);top:-100px;right:-100px;filter:blur(10px);animation:float 5s infinite}
+@keyframes float{50%{transform:translateY(20px)}}
+.logo{width:92px;height:92px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#A855F7,#1D4ED8);display:grid;place-items:center;font-size:48px;font-weight:900;margin:10px auto 10px;box-shadow:0 0 40px #7C3AED88;position:relative;z-index:1}
+.center{text-align:center;position:relative;z-index:1}.brand{font-size:26px;letter-spacing:2px;font-weight:900}.tag{color:var(--mut);font-size:13px;margin:4px 0 22px}
+.card{background:var(--card);border-radius:20px;padding:20px;position:relative;z-index:1;border:1px solid #ffffff14}
+h2{font-size:22px} .sub{color:var(--mut);font-size:13px;margin:6px 0 16px}
+label{font-size:12px;color:var(--mut);display:block;margin:12px 0 6px}
+input,select{width:100%;background:#080D1C;border:1px solid #ffffff22;color:#fff;padding:13px 14px;border-radius:12px;outline:none}
+input:focus{border-color:#A855F7;box-shadow:0 0 0 3px #7C3AED33}
+.row{display:flex;gap:10px;align-items:center}.flex1{flex:1}
+.btn{width:100%;padding:14px;border-radius:14px;background:linear-gradient(90deg,#7C3AED,#A855F7,#1D4ED8);color:#fff;font-weight:800;margin-top:16px;box-shadow:0 8px 25px #7C3AED55;transition:.2s}.btn:active{transform:scale(.98)}
+.btn2{background:#1D4ED8}.ghost{background:transparent;border:1px solid #ffffff22;margin-top:10px}
+.link{color:#C4B5FD;text-align:center;display:block;margin-top:14px;background:none;font-size:14px}
+.small{font-size:12px;color:var(--mut);text-align:center;margin-top:10px}
+.top{padding:14px 16px;background:var(--bg2);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
+.top b{font-size:20px}.top b span{color:#A855F7}
+.iconbtn{width:38px;height:38px;border-radius:50%;background:#16213A;color:#fff;display:grid;place-items:center;font-size:18px}
+.search{margin:10px 14px;background:#16213A;border-radius:20px;display:flex;align-items:center;padding:0 12px}.search input{background:transparent;border:0;padding:12px}
+.list{flex:1;overflow:auto;padding:0 10px 90px}.item{display:flex;gap:12px;padding:12px;border-radius:14px;align-items:center}.item:active{background:#16213A}
+.avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#1D4ED8);display:grid;place-items:center;font-weight:900;font-size:20px;flex-shrink:0;position:relative;overflow:hidden}.avatar img{width:100%;height:100%;object-fit:cover}
+.dot{position:absolute;right:1px;bottom:1px;width:13px;height:13px;background:var(--green);border:2px solid #080D1C;border-radius:50%}
+.meta{flex:1;min-width:0}.meta b{display:flex;justify-content:space-between}.meta p{color:var(--mut);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{background:linear-gradient(90deg,#7C3AED,#A855F7);font-size:11px;padding:3px 8px;border-radius:20px;min-width:20px;text-align:center}
+.fab{position:fixed;right:16px;bottom:88px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#A855F7);font-size:24px;color:#fff;box-shadow:0 10px 25px #7C3AED88;z-index:10}
+.nav{position:fixed;bottom:0;left:0;right:0;background:#101A30;border-top:1px solid #ffffff12;display:flex;padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:20}
+.nav button{flex:1;background:none;color:#A7B1C5;font-size:11px;display:flex;flex-direction:column;gap:2px;align-items:center}.nav button span{font-size:20px}.nav button.on{color:#A855F7}
+.chathead{padding:10px 12px;background:#101A30;display:flex;gap:10px;align-items:center}
+.bubble{max-width:82%;padding:10px 12px;border-radius:16px;margin:6px 0;font-size:15px;line-height:1.4;position:relative;word-break:break-word}
+.me{margin-left:auto;background:linear-gradient(135deg,#7C3AED,#A855F7);border-bottom-right-radius:4px}.other{background:#1D4ED8;background:#16213A;border:1px solid #ffffff12;border-bottom-left-radius:4px}
+.time{font-size:10px;opacity:.7;display:block;text-align:right;margin-top:4px}
+.msgs{flex:1;overflow:auto;padding:14px;background:#080D1C}
+.inputbar{display:flex;gap:8px;padding:10px;background:#101A30;align-items:center}.inputbar input{border-radius:24px}.round{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#A855F7);color:#fff;flex-shrink:0;font-size:18px}
+.typing{font-size:12px;color:#A855F7;padding:0 14px 6px}.empty{text-align:center;color:var(--mut);padding:40px 20px}
+.modal{position:fixed;inset:0;background:#000a;display:none;place-items:center;z-index:50;padding:16px}.modal.open{display:grid}.modal .card{width:100%;max-width:400px}
+.hidden{display:none!important}
+</style></head>
+<body>
+
+<!-- LOGIN -->
+<div id="scr-login" class="screen auth active"><div class="center"><div class="logo">C</div><div class="brand">CARLOS <span style="color:#A855F7">MESSENGER</span></div><div class="tag">Connect Beyond Limits ✨</div></div>
+<div class="card"><h2>Welcome Back! 👋</h2><p class="sub">Enter your details to continue.</p>
+<label>Username or Email or Phone</label><input id="loginId" placeholder="carlos / you@mail.com / +234...">
+<label>Password</label><div class="row"><input id="loginPass" type="password" placeholder="••••••••" class="flex1"><button class="iconbtn" onclick="togglePass('loginPass',this)">👁️</button></div>
+<div class="row" style="margin-top:12px"><input type="checkbox" id="remember" style="width:18px"><label style="margin:0">Remember Me</label><button class="link" style="margin:0;margin-left:auto" onclick="alert('Use OTP flow to reset - check Termux log for OTP')">Forgot Password?</button></div>
+<button class="btn" onclick="doLogin()">LOGIN →</button>
+<button class="btn ghost" onclick="alert('Google sign-in coming soon - use username/password for now')">G Google Sign-in</button>
+<button class="link" onclick="show('scr-register')">Don't have an account? <b>Create Account</b></button><p id="loginErr" class="small" style="color:#ff8a8a"></p></div></div>
+
+<!-- REGISTER -->
+<div id="scr-register" class="screen auth"><div class="center"><div class="logo">C</div><div class="brand">Create Account</div><div class="tag">Join CARLOS MESSENGER</div></div>
+<div class="card"><label>Full Name</label><input id="rName" placeholder="Carlos Excellent">
+<label>Username</label><input id="rUser" placeholder="carlos">
+<label>Email</label><input id="rEmail" placeholder="you@mail.com">
+<label>Phone with country code</label><input id="rPhone" placeholder="+234 801 234 5678">
+<label>Password</label><input id="rPass" type="password" placeholder="Min 6 chars">
+<label>Confirm Password</label><input id="rPass2" type="password">
+<div class="row"><button class="btn btn2" style="margin-top:12px" onclick="sendOtp()">Send OTP</button></div>
+<label>OTP Code (check Termux log)</label><input id="rOtp" placeholder="123456">
+<button class="btn" onclick="doRegister()">Create Account ✨</button>
+<button class="link" onclick="show('scr-login')">Already have account? Login</button><p id="regErr" class="small" style="color:#ff8a8a"></p></div></div>
+
+<!-- MAIN -->
+<div id="scr-main" class="screen">
+<div class="top"><b>CARLOS <span>MESSENGER</span></b><div class="row"><button class="iconbtn" onclick="loadUsers()">🔄</button><button class="iconbtn" onclick="logout()">⏻</button></div></div>
+<div class="search"><span>🔍</span><input id="searchInput" placeholder="Search contacts..." oninput="renderList()"></div>
+<div class="list" id="mainList"></div>
+<button class="fab" onclick="showNewChat()">+</button>
+<div class="nav">
+<button class="on" onclick="switchTab('chats',this)"> <span>💬</span>Chats</button>
+<button onclick="switchTab('updates',this)"><span>🔄</span>Updates</button>
+<button onclick="switchTab('communities',this)"><span>👥</span>Communities</button>
+<button onclick="switchTab('calls',this)"><span>📞</span>Calls</button>
+<button onclick="switchTab('settings',this)"><span>⚙️</span>Settings</button>
+</div></div>
+
+<!-- CHAT -->
+<div id="scr-chat" class="screen">
+<div class="chathead"><button class="iconbtn" onclick="show('scr-main')">←</button><div class="avatar" id="chatAvatar">?</div><div class="meta"><b id="chatName">Chat</b><p id="chatStatus">Tap to view profile</p></div><button class="iconbtn" onclick="alert('Voice call - coming soon, backend ready')">📞</button><button class="iconbtn" onclick="alert('Video call - coming soon')">📹</button></div>
+<div class="msgs" id="msgs"></div><div class="typing" id="typing"></div>
+<div class="inputbar"><button class="iconbtn" onclick="document.getElementById('fileIn').click()">📎</button><input type="file" id="fileIn" class="hidden" accept="image/*,video/*" onchange="sendFile(this)"><input id="msgInput" placeholder="Message..." oninput="sendTyping()" onkeydown="if(event.key==='Enter')sendMsg()"><button class="iconbtn" onclick="insertEmoji()">😊</button><button class="round" id="micBtn" onclick="toggleMic()">🎤</button><button class="round" onclick="sendMsg()">➤</button></div>
+</div>
+
+<!-- NEW CHAT MODAL -->
+<div id="modal" class="modal"><div class="card"><h2>New Chat</h2><p class="sub">Select a contact to start chatting</p><div id="userList" style="max-height:300px;overflow:auto"></div><button class="btn ghost" onclick="closeModal()">Close</button></div></div>
+
+<script>
+let token=localStorage.getItem('carlos_token')||'', me=null, users=[], chats=[], currentChat=null, currentTab='chats', socket=null, typingTimer=null, micOn=false;
+const $=id=>document.getElementById(id);
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active')}
+function togglePass(id,btn){let i=$(id);i.type=i.type==='password'?'text':'password'}
+function headers(){return {'Content-Type':'application/json','Authorization':'Bearer '+token}}
+async function api(p,opt={}){let r=await fetch(p,{...opt,headers:{...headers(),...(opt.headers||{})}});let j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Error');return j}
+function initSocket(){socket=io();socket.on('connect',()=>{if(me)socket.emit('join-user',me.id)});socket.on('new-message',m=>{if(currentChat&&m.chatId===currentChat.id)renderMsgs();else renderList()});socket.on('typing',d=>{if(currentChat&&d.chatId===currentChat.id){$('typing').textContent=d.user+' is typing...';clearTimeout(typingTimer);typingTimer=setTimeout(()=>$('typing').textContent='',1500)}});socket.on('message-status',()=>{if(currentChat)renderMsgs()})}
+async function doLogin(){try{let d=await api('/api/login',{method:'POST',body:JSON.stringify({login:$('loginId').value.trim(),password:$('loginPass').value})});token=d.token;localStorage.setItem('carlos_token',token);me=d.user;enterApp()}catch(e){$('loginErr').textContent=e.message}}
+async function sendOtp(){try{let p=$('rPhone').value.trim();if(!p)return $('regErr').textContent='Enter phone first';await api('/api/send-otp',{method:'POST',body:JSON.stringify({phone:p})});alert('OTP sent! Check Termux log for the code (Termii integration).')}catch(e){$('regErr').textContent=e.message}}
+async function doRegister(){try{if($('rPass').value!==$('rPass2').value)return $('regErr').textContent='Passwords do not match';if($('rPass').value.length<6)return $('regErr').textContent='Password min 6 chars';await api('/api/verify-otp',{method:'POST',body:JSON.stringify({phone:$('rPhone').value.trim(),code:$('rOtp').value.trim()})});let d=await api('/api/register',{method:'POST',body:JSON.stringify({name:$('rName').value,username:$('rUser').value,email:$('rEmail').value,phone:$('rPhone').value,password:$('rPass').value})});token=d.token;localStorage.setItem('carlos_token',token);me=d.user;enterApp()}catch(e){$('regErr').textContent=e.message+' - If OTP fails, check Termux log for correct OTP'}}
+function logout(){localStorage.removeItem('carlos_token');token='';show('scr-login')}
+async function enterApp(){show('scr-main');initSocket();await loadUsers();await loadChats();renderList()}
+async function loadUsers(){try{users=await api('/api/users');me=await api('/api/me');}catch(e){}}
+async function loadChats(){try{chats=await api('/api/chats')}catch(e){chats=[]}}
+function switchTab(t,btn){currentTab=t;document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderList()}
+function renderList(){let q=($('searchInput').value||'').toLowerCase();let el=$('mainList');if(currentTab==='chats'){let list=users.filter(u=>u.id!==me?.id&&u.username.toLowerCase().includes(q));if(!list.length)el.innerHTML='<div class="empty">No contacts yet.<br>Tap + to start a new chat.<br>Register another account to test.</div>';else el.innerHTML=list.map(u=>`<div class="item" onclick="openChatUser('${u.id}')"><div class="avatar">${u.name?u.name[0].toUpperCase():'?'}${u.online?'<span class="dot"></span>':''}</div><div class="meta"><b>${u.name||u.username}<span style="font-weight:400;font-size:11px;color:#A7B1C5">${new Date(u.lastSeen||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span></b><p>${u.online?'🟢 Online':'Last seen '+new Date(u.lastSeen||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} • @${u.username}</p></div><span class="badge">›</span></div>`).join('')}
+else if(currentTab==='updates'){el.innerHTML='<div style="padding:12px"><button class="btn" onclick="postStatus()" style="width:100%">+ Post My Status</button><div id="statusList" style="margin-top:12px">Loading...</div></div>';loadStatuses()}
+else if(currentTab==='communities'){el.innerHTML='<div class="empty">👥 <b>Communities</b><br><br><button class="btn" onclick="createGroup()">+ Create Community / Group</button><p style="margin-top:12px">Group uses real /api/chats with type=group</p></div>'}
+else if(currentTab==='calls'){el.innerHTML='<div class="empty">📞 <b>Calls</b><br>No calls yet.<br>Open a chat and tap 📞 to log a call via /api/calls</div>'}
+else{el.innerHTML=`<div class="card"><h2>Settings</h2><p class="sub">Signed in as @${me?.username||''}</p><label>Full Name</label><input id="setName" value="${me?.name||''}"><label>Bio</label><input id="setBio" value="${me?.bio||''}"><button class="btn" onclick="saveProfile()">Save Profile</button><button class="btn ghost" onclick="logout()">Logout</button></div>`}}
+async function postStatus(){let t=prompt('What is your status text?');if(!t)return;await api('/api/status',{method:'POST',body:JSON.stringify({text:t})});alert('Status posted!');loadStatuses()}
+async function loadStatuses(){try{let ss=await api('/api/status');let box=document.getElementById('statusList');if(!box)return;if(!ss.length){box.innerHTML='<div class="empty">No statuses yet. Be first!</div>';return}box.innerHTML=ss.map(s=>{let u=users.find(x=>x.id===s.userId);let name=u?(u.name||u.username):'User';return `<div style="background:#1A1A1A;padding:12px;border-radius:12px;margin-bottom:10px"><b>${name}</b> <span style="color:#888;font-size:12px">${new Date(s.createdAt).toLocaleString()}</span><div style="margin-top:6px">${(s.text||'').replace(/</g,'&lt;')}</div>${s.media?`<img src="${s.media}" style="width:100%;border-radius:10px;margin-top:8px">`:''}</div>`}).join('')}catch(e){let box=document.getElementById('statusList');if(box)box.innerHTML='Failed to load'}}
+async function createGroup(){let n=prompt('Group name?');if(!n)return;await api('/api/chats',{method:'POST',body:JSON.stringify({type:'group',name:n})});alert('Group created!');await loadChats()}
+async function saveProfile(){await api('/api/profile',{method:'POST',body:JSON.stringify({name:$('setName').value,bio:$('setBio').value})});alert('Saved!')}
+function showNewChat(){let el=$('userList');el.innerHTML=users.filter(u=>u.id!==me.id).map(u=>`<div class="item" onclick="closeModal();openChatUser('${u.id}')"><div class="avatar">${(u.name||u.username)[0].toUpperCase()}</div><div class="meta"><b>${u.name||u.username}</b><p>@${u.username}</p></div></div>`).join('')||'No users yet';$('modal').classList.add('open')}
+function closeModal(){$('modal').classList.remove('open')}
+async function openChatUser(uid){let u=users.find(x=>x.id===uid);let existing=chats.find(c=>c.type!=='group'&&c.members&&c.members.includes(uid)&&c.members.includes(me.id)&&c.members.length===2);if(!existing){try{existing=await api('/api/chats',{method:'POST',body:JSON.stringify({type:'private',name:u.name,members:[me.id,uid]})});chats.push(existing)}catch(e){existing={id:'temp-'+uid,name:u.name,members:[me.id,uid]}}}currentChat={...existing,other:u};$('chatName').textContent=u.name||u.username;$('chatStatus').textContent=u.online?'🟢 Online':'Last seen '+new Date(u.lastSeen||Date.now()).toLocaleString();$('chatAvatar').textContent=(u.name||u.username)[0].toUpperCase();show('scr-chat');if(socket)socket.emit('join',currentChat.id);renderMsgs()}
+async function renderMsgs(){if(!currentChat)return;try{let ms=await api('/api/messages/'+currentChat.id);let box=$('msgs');box.innerHTML=ms.filter(m=>!m.deleted).map(m=>{let mine=m.senderId===me.id;return `<div class="bubble ${mine?'me':'other'}">${m.type==='image'?`<img src="${m.fileUrl}" style="width:100%;border-radius:10px">`:m.text.replace(/</g,'&lt;')}<span class="time">${new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} ${mine?(m.status==='read'?'<span style="color:#25D366">✓✓</span>':m.status==='delivered'?'<span style="color:#8696A0">✓✓</span>':'<span style="color:#8696A0">✓</span>'):''}</span></div>`}).join('')||'<div class="empty">No messages yet. Say Hi! 👋</div>';box.scrollTop=box.scrollHeight;ms.forEach(m=>{if(!m||m.senderId===me.id)return;if(socket)socket.emit('read',m.id)})}catch(e){}}
+async function sendMsg(){let t=$('msgInput').value.trim();if(!t||!currentChat)return;await api('/api/messages',{method:'POST',body:JSON.stringify({chatId:currentChat.id,text:t})});$('msgInput').value='';renderMsgs()}
+function sendTyping(){if(socket&&currentChat)socket.emit('typing',{chatId:currentChat.id,user:me.username})}
+function insertEmoji(){let e=prompt('Pick emoji: 😀 😂 ❤️ 🔥 👍 🎉');if(e)$('msgInput').value+=e}
+function toggleMic(){micOn=!micOn;$('micBtn').textContent=micOn?'⏹️':'🎤';if(micOn){alert('Voice note UI: Hold to record - backend: send as audio message (coming in next update, UI ready). Tap mic again to stop.');if(socket&&currentChat)socket.emit('recording',{chatId:currentChat.id})}}
+function sendFile(el){let f=el.files[0];if(!f)return;let r=new FileReader();r.onload=async()=>{await api('/api/messages',{method:'POST',body:JSON.stringify({chatId:currentChat.id,text:'📷 Image',type:'image',fileUrl:r.result})});renderMsgs()};r.readAsDataURL(f)}
+if(token){(async()=>{try{me=await api('/api/me');enterApp()}catch(e){show('scr-login')}})()}
 </script></body></html>
